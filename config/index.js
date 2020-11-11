@@ -4,4 +4,6 @@ dotenv.config();
 
 export default {
   port: process.env.PORT,
+  sessionSecret: process.env.SESSION_SECRET,
+  nodeEnv: process.env.NODE_ENV,
 };
