@@ -17,6 +17,7 @@
   "rules": {
     "prettier/prettier": ["error"],
     "node/shebang": ["off"],
-    "import/extensions": ["off"]
+    "import/extensions": ["off"],
+    "no-useless-escape": 0
   }
 }
