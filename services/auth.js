@@ -24,7 +24,7 @@ const verifyPassword = (encodedHash, password) => {
 };
 
 const validatePassword = (password) => {
-  const signUpSchema = Joi.string()
+  const passwordSchema = Joi.string()
     .regex(/[0-9]/)
     .regex(/[A-Z]/)
     .regex(/[a-z]/)
@@ -32,7 +32,7 @@ const validatePassword = (password) => {
     .min(8)
     .max(26)
     .required();
-  const { error } = signUpSchema.validate(password);
+  const { error } = passwordSchema.validate(password);
   if (error) {
     return false;
   }
@@ -67,6 +67,15 @@ const fillUsername = (username, email) => {
 
 const signUp = async (req, res) => {
   try {
+    const { userId } = req.session;
+
+    if (userId) {
+      return res.status(400).json({
+        code: 400,
+        message: "A User is already logged in",
+      });
+    }
+
     const { username, email, password } = req.body;
 
     if (!email || !password) {
@@ -142,6 +151,15 @@ const signUp = async (req, res) => {
 
 const signIn = async (req, res) => {
   try {
+    const { userId } = req.session;
+
+    if (userId) {
+      return res.status(400).json({
+        code: 400,
+        message: "User already logged in",
+      });
+    }
+
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -183,10 +201,47 @@ const signIn = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       code: 500,
-      message: "There was a problem creating your account",
+      message: "There was a problem logging into your account",
       error,
     });
   }
 };
 
-export { signUp, signIn, hashPassword, verifyPassword, validatePassword };
+const logout = async (req, res) => {
+  try {
+    const { userId } = req.session;
+
+    if (!userId) {
+      return res.status(400).json({
+        code: 400,
+        message: "User is not logged in",
+      });
+    }
+
+    req.session.destroy((error) => {
+      if (error) {
+        debug(error);
+      }
+    });
+
+    return res.status(204).send({
+      code: 204,
+      message: "Logout successful",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      code: 500,
+      message: "There was a problem logging out",
+      error,
+    });
+  }
+};
+
+export {
+  signUp,
+  signIn,
+  logout,
+  hashPassword,
+  verifyPassword,
+  validatePassword,
+};
