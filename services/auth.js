@@ -20,11 +20,7 @@ const hashPassword = async (password) => {
 };
 
 const verifyPassword = (encodedHash, password) => {
-  argon2i
-    .verify(encodedHash, password)
-    .then((correct) =>
-      debug(correct ? "Correct password!" : "Incorrect password")
-    );
+  return argon2i.verify(encodedHash, password);
 };
 
 const validatePassword = (password) => {
@@ -75,30 +71,37 @@ const signUp = async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({
+        code: 400,
         message: "Email and Password are required",
       });
     }
 
     if (!validatePassword(password)) {
-      return res.status(400).json({
+      return res.status(422).json({
+        code: 422,
         message:
           "Invalid password format : password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 digit, 1 special character and at most 26 characters",
       });
     }
 
     if (!validateEmail(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
+      return res
+        .status(422)
+        .json({ code: 422, message: "Invalid email format" });
     }
 
     const emailExist = await User.findOne({ email }).lean();
     if (emailExist) {
-      return res.status(400).json({ message: "Email already exists" });
+      return res
+        .status(409)
+        .json({ code: 409, message: "Email already exists" });
     }
 
     const filledUsername = fillUsername(username, email);
 
     if (!validateUsername(filledUsername)) {
-      return res.status(400).json({
+      return res.status(422).json({
+        code: 422,
         message:
           "Invalid username format : username must contain at least 3 characters.",
       });
@@ -106,7 +109,8 @@ const signUp = async (req, res) => {
 
     const usernameExist = await User.findOne({ username }).lean();
     if (usernameExist) {
-      return res.status(400).json({
+      return res.status(409).json({
+        code: 409,
         message: "Username already exists",
       });
     }
@@ -122,16 +126,67 @@ const signUp = async (req, res) => {
     const { username: savedUsername, email: savedEmail } = await newUser.save();
 
     return res.status(200).json({
+      code: 200,
       message: "User created!",
       savedUsername,
       savedEmail,
     });
   } catch (error) {
-    return res.status(400).json({
+    return res.status(500).json({
+      code: 500,
       message: "There was a problem creating your account",
       error,
     });
   }
 };
 
-export { signUp, hashPassword, verifyPassword, validatePassword };
+const signIn = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        code: 400,
+        message: "Email and Password are required",
+      });
+    }
+
+    const user = await User.findOne({ email }).lean();
+    if (!user) {
+      return res
+        .status(409)
+        .json({ code: 409, message: "Invalid credentials" });
+    }
+
+    const passwordValid = await verifyPassword(user.password, password);
+
+    if (!passwordValid) {
+      return res
+        .status(409)
+        .json({ code: 409, message: "Invalid credentials" });
+    }
+
+    const { _id, createdAt, updatedAt } = user;
+    req.session.userId = _id;
+
+    return res.status(200).json({
+      code: 200,
+      message: "User signed in!",
+      user: {
+        id: _id,
+        username: user.username,
+        email: user.email,
+        createdAt,
+        updatedAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      code: 500,
+      message: "There was a problem creating your account",
+      error,
+    });
+  }
+};
+
+export { signUp, signIn, hashPassword, verifyPassword, validatePassword };
