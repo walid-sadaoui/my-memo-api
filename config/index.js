@@ -7,4 +7,5 @@ export default {
   sessionSecret: process.env.SESSION_SECRET,
   nodeEnv: process.env.NODE_ENV,
   databaseUrl: process.env.DATABASE_URL,
+  clientUrl: process.env.CLIENT_URL,
 };

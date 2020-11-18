@@ -132,13 +132,24 @@ const signUp = async (req, res) => {
       password: hashedPassword,
     });
 
-    const { username: savedUsername, email: savedEmail } = await newUser.save();
+    const {
+      _id: newUserId,
+      username: newUsername,
+      email: newEmail,
+      createdAt,
+      updatedAt,
+    } = await newUser.save();
 
     return res.status(200).json({
       code: 200,
       message: "User created!",
-      savedUsername,
-      savedEmail,
+      user: {
+        id: newUserId,
+        username: newUsername,
+        email: newEmail,
+        createdAt,
+        updatedAt,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -151,9 +162,9 @@ const signUp = async (req, res) => {
 
 const signIn = async (req, res) => {
   try {
-    const { userId } = req.session;
+    const { user } = req.session;
 
-    if (userId) {
+    if (user) {
       return res.status(400).json({
         code: 400,
         message: "User already logged in",
@@ -169,14 +180,14 @@ const signIn = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email }).lean();
-    if (!user) {
+    const userByEmail = await User.findOne({ email }).lean();
+    if (!userByEmail) {
       return res
         .status(409)
         .json({ code: 409, message: "Invalid credentials" });
     }
 
-    const passwordValid = await verifyPassword(user.password, password);
+    const passwordValid = await verifyPassword(userByEmail.password, password);
 
     if (!passwordValid) {
       return res
@@ -184,16 +195,29 @@ const signIn = async (req, res) => {
         .json({ code: 409, message: "Invalid credentials" });
     }
 
-    const { _id, createdAt, updatedAt } = user;
-    req.session.userId = _id;
+    const {
+      _id,
+      username,
+      email: userEmail,
+      createdAt,
+      updatedAt,
+    } = userByEmail;
+
+    req.session.user = {
+      _id,
+      username,
+      email: userEmail,
+      createdAt,
+      updatedAt,
+    };
 
     return res.status(200).json({
       code: 200,
       message: "User signed in!",
       user: {
         id: _id,
-        username: user.username,
-        email: user.email,
+        username,
+        email: userEmail,
         createdAt,
         updatedAt,
       },
@@ -209,9 +233,9 @@ const signIn = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
-    const { userId } = req.session;
+    const { user } = req.session;
 
-    if (!userId) {
+    if (!user) {
       return res.status(400).json({
         code: 400,
         message: "User is not logged in",
