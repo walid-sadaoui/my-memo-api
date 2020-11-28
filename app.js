@@ -1,4 +1,3 @@
-import createError from "http-errors";
 import express from "express";
 import logger from "morgan";
 import helmet from "helmet";
@@ -51,9 +50,11 @@ app.use("/", indexRouter);
 app.use("/user", usersRouter);
 app.use("/me", currentUserRouter);
 
-// catch 404 and forward to error handler
-app.use((req, res, next) => {
-  next(createError(404));
+// eslint-disable-next-line
+app.use((error, req, res, next) => {
+  return res.status(error.httpCode || 500).json({
+    error,
+  });
 });
 
 export default app;

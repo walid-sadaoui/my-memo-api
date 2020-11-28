@@ -4,6 +4,7 @@ import Promise from "bluebird";
 import Debug from "debug";
 import Joi from "joi";
 import User from "../models/user.js";
+import AppError from "./errorHandler.js";
 
 const debug = Debug("my-memo-api:auth-service");
 
@@ -65,63 +66,48 @@ const fillUsername = (username, email) => {
   return filledUsername;
 };
 
-const signUp = async (req, res) => {
+const signUp = async (username, email, password) => {
   try {
-    const { userId } = req.session;
-
-    if (userId) {
-      return res.status(400).json({
-        code: 400,
-        message: "A User is already logged in",
-      });
-    }
-
-    const { username, email, password } = req.body;
-
     if (!email || !password) {
-      return res.status(400).json({
-        code: 400,
-        message: "Email and Password are required",
-      });
+      throw new AppError(
+        "Auth error",
+        400,
+        "Email and Password are required",
+        true
+      );
     }
 
     if (!validatePassword(password)) {
-      return res.status(422).json({
-        code: 422,
-        message:
-          "Invalid password format : password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 digit, 1 special character and at most 26 characters",
-      });
+      throw new AppError(
+        "Auth error",
+        422,
+        "Invalid password format : password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 digit, 1 special character and at most 26 characters",
+        true
+      );
     }
 
     if (!validateEmail(email)) {
-      return res
-        .status(422)
-        .json({ code: 422, message: "Invalid email format" });
+      throw new AppError("Auth error", 422, "Invalid email format", true);
     }
 
     const emailExist = await User.findOne({ email }).lean();
     if (emailExist) {
-      return res
-        .status(409)
-        .json({ code: 409, message: "Email already exists" });
+      throw new AppError("Auth error", 409, "Email already exists", true);
     }
 
     const filledUsername = fillUsername(username, email);
-
     if (!validateUsername(filledUsername)) {
-      return res.status(422).json({
-        code: 422,
-        message:
-          "Invalid username format : username must contain at least 3 characters.",
-      });
+      throw new AppError(
+        "Auth error",
+        422,
+        "Invalid username format : username must contain at least 3 characters.",
+        true
+      );
     }
 
     const usernameExist = await User.findOne({ username }).lean();
     if (usernameExist) {
-      return res.status(409).json({
-        code: 409,
-        message: "Username already exists",
-      });
+      throw new AppError("Auth error", 409, "Username already exists", true);
     }
 
     const hashedPassword = await hashPassword(password);
@@ -131,141 +117,55 @@ const signUp = async (req, res) => {
       email,
       password: hashedPassword,
     });
+    const userSignedUp = await newUser.save();
 
-    const {
-      _id: newUserId,
-      username: newUsername,
-      email: newEmail,
-      createdAt,
-      updatedAt,
-    } = await newUser.save();
+    const { password: userPassword, __v, ...rest } = userSignedUp;
+    const userInfo = { ...rest };
 
-    return res.status(200).json({
-      code: 200,
-      message: "User created!",
-      user: {
-        id: newUserId,
-        username: newUsername,
-        email: newEmail,
-        createdAt,
-        updatedAt,
-      },
-    });
+    return userInfo;
   } catch (error) {
-    return res.status(500).json({
-      code: 500,
-      message: "There was a problem creating your account",
-      error,
-    });
+    throw new AppError(
+      "Auth error",
+      error.httpCode || 500,
+      error.description || "There was a problem logging into your account",
+      true
+    );
   }
 };
 
-const signIn = async (req, res) => {
+const logIn = async (email, password) => {
   try {
-    const { user } = req.session;
-
-    if (user) {
-      return res.status(400).json({
-        code: 400,
-        message: "User already logged in",
-      });
-    }
-
-    const { email, password } = req.body;
-
     if (!email || !password) {
-      return res.status(400).json({
-        code: 400,
-        message: "Email and Password are required",
-      });
+      throw new AppError(
+        "Auth error",
+        400,
+        "Email and Password are required",
+        true
+      );
     }
 
-    const userByEmail = await User.findOne({ email }).lean();
-    if (!userByEmail) {
-      return res
-        .status(409)
-        .json({ code: 409, message: "Invalid credentials" });
-    }
-
-    const passwordValid = await verifyPassword(userByEmail.password, password);
-
-    if (!passwordValid) {
-      return res
-        .status(409)
-        .json({ code: 409, message: "Invalid credentials" });
-    }
-
-    const {
-      _id,
-      username,
-      email: userEmail,
-      createdAt,
-      updatedAt,
-    } = userByEmail;
-
-    req.session.user = {
-      _id,
-      username,
-      email: userEmail,
-      createdAt,
-      updatedAt,
-    };
-
-    return res.status(200).json({
-      code: 200,
-      message: "User signed in!",
-      user: {
-        id: _id,
-        username,
-        email: userEmail,
-        createdAt,
-        updatedAt,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      code: 500,
-      message: "There was a problem logging into your account",
-      error,
-    });
-  }
-};
-
-const logout = async (req, res) => {
-  try {
-    const { user } = req.session;
-
+    const user = await User.findOne({ email }).lean();
     if (!user) {
-      return res.status(400).json({
-        code: 400,
-        message: "User is not logged in",
-      });
+      throw new AppError("Auth error", 409, "Invalid credentials", true);
     }
 
-    req.session.destroy((error) => {
-      if (error) {
-        debug(error);
-      }
-    });
+    const passwordValid = await verifyPassword(user.password, password);
+    if (!passwordValid) {
+      throw new AppError("Auth error", 409, "Invalid credentials", true);
+    }
 
-    return res.status(204).send({
-      code: 204,
-      message: "Logout successful",
-    });
+    const { password: userPassword, __v, ...rest } = user;
+    const userInfo = { ...rest };
+
+    return userInfo;
   } catch (error) {
-    return res.status(500).json({
-      code: 500,
-      message: "There was a problem logging out",
-      error,
-    });
+    throw new AppError(
+      "Auth error",
+      error.httpCode || 500,
+      error.description || "There was a problem logging into your account",
+      true
+    );
   }
 };
 
-export {
-  signUp,
-  signIn,
-  logout,
-  hashPassword,
-  verifyPassword,
-  validatePassword,
-};
+export { signUp, logIn, hashPassword, verifyPassword, validatePassword };
