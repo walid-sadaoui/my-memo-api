@@ -9,6 +9,7 @@ import config from "./config/index.js";
 import indexRouter from "./routes/index.js";
 import usersRouter from "./routes/users.js";
 import currentUserRouter from "./routes/currentUser.js";
+import notesRouter from "./routes/notes.js";
 
 const RedisStore = ConnectRedis(session);
 const redisClient = redis.createClient();
@@ -49,6 +50,7 @@ app.use(
 app.use("/", indexRouter);
 app.use("/user", usersRouter);
 app.use("/me", currentUserRouter);
+app.use("/notes", notesRouter);
 
 // eslint-disable-next-line
 app.use((error, req, res, next) => {

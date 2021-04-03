@@ -27,7 +27,7 @@ router.post("/signup", async (req, res, next) => {
     return res.status(200).json({
       data: {
         code: 200,
-        message: "User signed in!",
+        message: "User created!",
         user: userSignedUp,
       },
     });
