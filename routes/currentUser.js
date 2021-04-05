@@ -1,8 +1,9 @@
 import express from "express";
-import Note from "../models/note.js";
+import User from "../models/user.js";
 import AppError from "../services/errorHandler.js";
 
 const router = express.Router();
+const USER_FIELDS = "_id username  email createdAt updatedAt";
 
 /* GET current user. */
 router.get("/", (req, res, next) => {
@@ -18,7 +19,7 @@ router.get("/", (req, res, next) => {
         code: 200,
         message: "Authenticated user found !",
         user: {
-          id: _id,
+          _id,
           username,
           email,
           createdAt,
@@ -31,32 +32,28 @@ router.get("/", (req, res, next) => {
   }
 });
 
-/* GET user notes. */
-router.get("/notes", async (req, res, next) => {
+/* GET current user. */
+router.patch("/", async (req, res, next) => {
   try {
     const { user } = req.session;
+    const { _id } = user;
+    const { username, email, password } = req.body;
+
     if (!user) {
       throw new AppError("Auth error", 400, "User is not logged in", true);
     }
 
-    const { _id: idUser, username } = user;
-    const userNotes = await Note.find(
-      { idUser },
-      "_id description pinned"
-    ).lean();
-    if (userNotes.length === 0) {
-      throw new AppError(
-        "Notes Error",
-        409,
-        "No notes found for this user",
-        true
-      );
-    }
+    const updatedUser = await User.findOneAndUpdate(
+      { _id },
+      { username, email, password },
+      { new: true, fields: USER_FIELDS }
+    );
+
     return res.status(200).send({
       data: {
         code: 200,
-        message: `Notes of ${username} found!`,
-        notes: userNotes,
+        message: "User informations updated !",
+        user: updatedUser,
       },
     });
   } catch (error) {
