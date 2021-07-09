@@ -41,11 +41,16 @@ app.use(
       httpOnly: false,
       sameSite: isProduction ? "none" : "strict",
     },
-    store: new RedisStore({
-      host: "localhost",
-      port: 6379,
-      client: redisClient,
-    }),
+    store:
+      process.env.NODE_ENV === "production"
+        ? new RedisStore({
+            url: process.env.REDIS_URL,
+          })
+        : new RedisStore({
+            host: "localhost",
+            port: 6379,
+            client: redisClient,
+          }),
   })
 );
 app.use("/", indexRouter);
